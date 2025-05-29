@@ -40,9 +40,9 @@ def fit_piecewise(df_person):
     except RuntimeError:
         return None
 
-
 st.set_page_config(layout="wide")
 
+# -- for styling -- 
 st.markdown("""
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
@@ -101,46 +101,47 @@ df_filtered = df_clean[
 
 # Preview filtered data
 st.markdown("### Filtered Data Preview")
-st.write(df_filtered.head())
+st.write(df_filtered.head(11))
 
 # Plot viral load over time
-sample_ids = df_filtered["PersonID"].unique()[:10]  # Limit to 10 people
+sample_ids = df_filtered["PersonID"].unique()[:25]  # Limit to 25 people
 df_sample = df_filtered[df_filtered["PersonID"].isin(sample_ids)]
 
 fig, ax = plt.subplots(figsize=(10, 6))
 for pid, group in df_sample.groupby("PersonID"):
     ax.plot(group["TimeDays"], group["Log10VL"], label=f"Person {pid}", alpha=0.6)
 
-ax.set_title("Viral Load Over Time (Sample of 10 People)")
+ax.set_title("Viral Load Over Time (Sample of 25 People)")
 ax.set_xlabel("Days Since Symptom Onset or Exposure")
 ax.set_ylabel("Log10 Viral Load")
 ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
 ax.grid(True)
+# fig.savefig("plot.png", dpi=300)
 st.pyplot(fig)
 
 
-# Fit to a single person
-person_ids = df_filtered["PersonID"].unique()
-selected_person = st.selectbox("Select a person to fit model to", options=person_ids)
-df_person = df_filtered[df_filtered["PersonID"] == selected_person].sort_values("TimeDays")
+# -- Fit to a single person -- 
+# person_ids = df_filtered["PersonID"].unique()
+# selected_person = st.selectbox("Select a person to fit model to", options=person_ids)
+# df_person = df_filtered[df_filtered["PersonID"] == selected_person].sort_values("TimeDays")
 
-fit_params = fit_piecewise(df_person)
+# fit_params = fit_piecewise(df_person)
 
-st.markdown("### Piecewise Linear Fit")
+# st.markdown("### Piecewise Linear Fit")
 
-fig2, ax2 = plt.subplots(figsize=(8, 5))
-ax2.scatter(df_person["TimeDays"], df_person["Log10VL"], label="Observed", color="blue")
+# fig2, ax2 = plt.subplots(figsize=(8, 5))
+# ax2.scatter(df_person["TimeDays"], df_person["Log10VL"], label="Observed", color="blue")
 
-if fit_params is not None:
-    t_fit = np.linspace(df_person["TimeDays"].min(), df_person["TimeDays"].max(), 200)
-    y_fit = piecewise_linear(t_fit, *fit_params)
-    ax2.plot(t_fit, y_fit, label="Piecewise Fit", color="red", linewidth=2)
-    ax2.set_title("Piecewise Linear Fit to Viral Kinetics")
-    ax2.set_xlabel("Time (days)")
-    ax2.set_ylabel("Log10 Viral Load")
-    ax2.legend()
-else:
-    ax2.set_title("Fit failed for this individual.")
+# if fit_params is not None:
+#     t_fit = np.linspace(df_person["TimeDays"].min(), df_person["TimeDays"].max(), 200)
+#     y_fit = piecewise_linear(t_fit, *fit_params)
+#     ax2.plot(t_fit, y_fit, label="Piecewise Fit", color="red", linewidth=2)
+#     ax2.set_title("Piecewise Linear Fit to Viral Kinetics")
+#     ax2.set_xlabel("Time (days)")
+#     ax2.set_ylabel("Log10 Viral Load")
+#     ax2.legend()
+# else:
+#     ax2.set_title("Fit failed for this individual.")
 
-st.pyplot(fig2)
+# st.pyplot(fig2)
 
