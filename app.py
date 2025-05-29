@@ -2,8 +2,56 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+from scipy.optimize import curve_fit
+import numpy as np
+
+def piecewise_linear(t, t1, t2, t3, y0, s1, s2):
+    """
+    Piecewise linear viral kinetics:
+    y = y0 (baseline)
+      + s1 * (t - t1) if t1 < t < t2 (rise)
+      + s2 * (t - t2) if t2 < t < t3 (fall)
+      + 0 otherwise
+    All lines are connected.
+    """
+    y = np.full_like(t, y0)
+    y += np.where(t >= t1, s1 * (np.minimum(t, t2) - t1), 0)
+    y += np.where(t >= t2, s2 * (np.minimum(t, t3) - t2), 0)
+    return y
+
+
+def fit_piecewise(df_person):
+    t = df_person["TimeDays"].values
+    y = df_person["Log10VL"].values
+
+    # Reasonable initial guesses
+    t1_init = np.percentile(t, 10)
+    t2_init = np.percentile(t, 40)
+    t3_init = np.percentile(t, 80)
+    y0_init = np.min(y)
+    s1_init = 1.0
+    s2_init = -1.0
+
+    p0 = [t1_init, t2_init, t3_init, y0_init, s1_init, s2_init]
+
+    try:
+        popt, _ = curve_fit(piecewise_linear, t, y, p0=p0)
+        return popt
+    except RuntimeError:
+        return None
+
 
 st.set_page_config(layout="wide")
+
+st.markdown("""
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+    html, body, div, span, h1, h2, h3, h4, h5, h6, p, label, input, textarea {
+        font-family: 'Montserrat', sans-serif !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("Viral Kinetics Explorer")
 
 DEFAULT_PATH = os.path.join("data", "combined_cleaned_data.csv")
@@ -69,3 +117,30 @@ ax.set_ylabel("Log10 Viral Load")
 ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
 ax.grid(True)
 st.pyplot(fig)
+
+
+# Fit to a single person
+person_ids = df_filtered["PersonID"].unique()
+selected_person = st.selectbox("Select a person to fit model to", options=person_ids)
+df_person = df_filtered[df_filtered["PersonID"] == selected_person].sort_values("TimeDays")
+
+fit_params = fit_piecewise(df_person)
+
+st.markdown("### Piecewise Linear Fit")
+
+fig2, ax2 = plt.subplots(figsize=(8, 5))
+ax2.scatter(df_person["TimeDays"], df_person["Log10VL"], label="Observed", color="blue")
+
+if fit_params is not None:
+    t_fit = np.linspace(df_person["TimeDays"].min(), df_person["TimeDays"].max(), 200)
+    y_fit = piecewise_linear(t_fit, *fit_params)
+    ax2.plot(t_fit, y_fit, label="Piecewise Fit", color="red", linewidth=2)
+    ax2.set_title("Piecewise Linear Fit to Viral Kinetics")
+    ax2.set_xlabel("Time (days)")
+    ax2.set_ylabel("Log10 Viral Load")
+    ax2.legend()
+else:
+    ax2.set_title("Fit failed for this individual.")
+
+st.pyplot(fig2)
+
