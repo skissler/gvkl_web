@@ -1,5 +1,6 @@
 # To deploy locally, run this in bash: 
 # streamlit run app.py
+# deployed at https://globalvklib.streamlit.app/
 
 import streamlit as st
 import pandas as pd
