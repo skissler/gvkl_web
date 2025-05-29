@@ -4,7 +4,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
+# import os
 from scipy.optimize import curve_fit
 import numpy as np
 from utils.plotting import save_streamlit_style_figure
@@ -24,7 +24,8 @@ st.markdown("""
 
 st.title("Viral Kinetics Explorer")
 
-DEFAULT_PATH = os.path.join("data", "combined_cleaned_data.csv")
+# DEFAULT_PATH = os.path.join("data", "combined_cleaned_data.csv")
+DEFAULT_PATH = "data/combined_cleaned_data.csv"
 
 uploaded_file = st.file_uploader("Upload your viral kinetics CSV (or use default below)", type=["csv"])
 
