@@ -1,44 +1,14 @@
+# To deploy locally, run this in bash: 
+# streamlit run app.py
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
 from scipy.optimize import curve_fit
 import numpy as np
-
-def piecewise_linear(t, t1, t2, t3, y0, s1, s2):
-    """
-    Piecewise linear viral kinetics:
-    y = y0 (baseline)
-      + s1 * (t - t1) if t1 < t < t2 (rise)
-      + s2 * (t - t2) if t2 < t < t3 (fall)
-      + 0 otherwise
-    All lines are connected.
-    """
-    y = np.full_like(t, y0)
-    y += np.where(t >= t1, s1 * (np.minimum(t, t2) - t1), 0)
-    y += np.where(t >= t2, s2 * (np.minimum(t, t3) - t2), 0)
-    return y
-
-
-def fit_piecewise(df_person):
-    t = df_person["TimeDays"].values
-    y = df_person["Log10VL"].values
-
-    # Reasonable initial guesses
-    t1_init = np.percentile(t, 10)
-    t2_init = np.percentile(t, 40)
-    t3_init = np.percentile(t, 80)
-    y0_init = np.min(y)
-    s1_init = 1.0
-    s2_init = -1.0
-
-    p0 = [t1_init, t2_init, t3_init, y0_init, s1_init, s2_init]
-
-    try:
-        popt, _ = curve_fit(piecewise_linear, t, y, p0=p0)
-        return popt
-    except RuntimeError:
-        return None
+from utils.plotting import save_streamlit_style_figure
+from utils.modeling import piecewise_linear, fit_piecewise
 
 st.set_page_config(layout="wide")
 
@@ -101,22 +71,54 @@ df_filtered = df_clean[
 
 # Preview filtered data
 st.markdown("### Filtered Data Preview")
-st.write(df_filtered.head(11))
+# st.write(df_filtered.head(100))
+st.write(df_filtered)
 
 # Plot viral load over time
 sample_ids = df_filtered["PersonID"].unique()[:25]  # Limit to 25 people
 df_sample = df_filtered[df_filtered["PersonID"].isin(sample_ids)]
 
+# Determine which grouping columns exist and have non-null values
+grouping_cols = ["PersonID"]
+if "InfectionID" in df_sample.columns and df_sample["InfectionID"].notna().any():
+    grouping_cols.append("InfectionID")
+if "SampleType" in df_sample.columns and df_sample["SampleType"].notna().any():
+    grouping_cols.append("SampleType")
+
 fig, ax = plt.subplots(figsize=(10, 6))
-for pid, group in df_sample.groupby("PersonID"):
-    ax.plot(group["TimeDays"], group["Log10VL"], label=f"Person {pid}", alpha=0.6)
+
+# Plot each trajectory
+for _, group in df_sample.groupby(grouping_cols):
+    # Apply GE/ml transformation if slope and intercept are present
+    if {"GEml_conversion_slope", "GEml_conversion_intercept"}.issubset(group.columns):
+        ge_values = group["Log10VL"] * group["GEml_conversion_slope"] + group["GEml_conversion_intercept"]
+    else:
+        ge_values = group["Log10VL"]  # fallback to raw if conversion values missing
+
+    ax.plot(
+        group["TimeDays"], ge_values,
+        color='black',
+        alpha=0.2,
+        linewidth=1,
+        marker='o',
+        markersize=4,
+        markerfacecolor='black',
+        markeredgewidth=0,
+    )
 
 ax.set_title("Viral Load Over Time (Sample of 25 People)")
-ax.set_xlabel("Days Since Symptom Onset or Exposure")
-ax.set_ylabel("Log10 Viral Load")
-ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
+ax.set_xlabel("Time (days)")
+
+# Update y-axis label based on transformation
+if {"GEml_conversion_slope", "GEml_conversion_intercept"}.issubset(df_sample.columns):
+    ax.set_ylabel("Log10 Genome Equivalents per ml (GE/ml, transformed)")
+else:
+    ax.set_ylabel("Log10 Viral Load")
+
 ax.grid(True)
-# fig.savefig("plot.png", dpi=300)
+ax.set_facecolor("white")
+
+# Display in Streamlit
 st.pyplot(fig)
 
 
